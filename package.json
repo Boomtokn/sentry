@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@acemarke/react-prod-sourcemaps": "^0.2.1",
-    "@amplitude/analytics-browser": "^1.5.3",
+    "@amplitude/analytics-browser": "^2.11.11",
     "@babel/core": "~7.25.9",
     "@babel/plugin-transform-runtime": "~7.25.9",
     "@babel/preset-env": "~7.25.9",
