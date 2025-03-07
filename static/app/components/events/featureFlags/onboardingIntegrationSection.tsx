@@ -10,11 +10,11 @@ import {hasEveryAccess} from 'sentry/components/acl/access';
 import {Button} from 'sentry/components/button';
 import {Flex} from 'sentry/components/container/flex';
 import {Alert} from 'sentry/components/core/alert';
+import {Input} from 'sentry/components/core/input';
 import {
   PROVIDER_TO_SETUP_WEBHOOK_URL,
   WebhookProviderEnum,
 } from 'sentry/components/events/featureFlags/utils';
-import Input from 'sentry/components/input';
 import ExternalLink from 'sentry/components/links/externalLink';
 import TextCopyInput from 'sentry/components/textCopyInput';
 import {Tooltip} from 'sentry/components/tooltip';
@@ -26,11 +26,11 @@ import {useMutation, useQueryClient} from 'sentry/utils/queryClient';
 import type RequestError from 'sentry/utils/requestError/requestError';
 import useApi from 'sentry/utils/useApi';
 import useOrganization from 'sentry/utils/useOrganization';
-import {makeFetchSecretQueryKey} from 'sentry/views/settings/featureFlags';
+import {makeFetchSecretQueryKey} from 'sentry/views/settings/featureFlags/changeTracking';
 import type {
   CreateSecretQueryVariables,
   CreateSecretResponse,
-} from 'sentry/views/settings/featureFlags/newProviderForm';
+} from 'sentry/views/settings/featureFlags/changeTracking/newProviderForm';
 
 export default function OnboardingIntegrationSection({
   provider,

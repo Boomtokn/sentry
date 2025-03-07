@@ -120,6 +120,7 @@ export enum FieldKey {
   TRANSACTION_DURATION = 'transaction.duration',
   TRANSACTION_OP = 'transaction.op',
   TRANSACTION_STATUS = 'transaction.status',
+  TYPE = 'type',
   UNREAL_CRASH_TYPE = 'unreal.crash_type',
   USER = 'user',
   USER_DISPLAY = 'user.display',
@@ -1170,6 +1171,7 @@ type TraceFields =
   | SpanIndexedField.SPAN_GROUP
   | SpanIndexedField.SPAN_MODULE
   | SpanIndexedField.SPAN_OP
+  | SpanIndexedField.NORMALIZED_DESCRIPTION
   // TODO: Remove self time field when it is deprecated
   | SpanIndexedField.SPAN_SELF_TIME
   | SpanIndexedField.SPAN_STATUS
@@ -1179,13 +1181,20 @@ export const TRACE_FIELD_DEFINITIONS: Record<TraceFields, FieldDefinition> = {
   /** Indexed Fields */
   [SpanIndexedField.SPAN_ACTION]: {
     desc: t(
-      'The type of span action, e.g `SELECT` for a SQL span or `POST` for an HTTP span'
+      'The Sentry Insights span action, e.g `SELECT` for a SQL span or `POST` for an HTTP client span'
     ),
     kind: FieldKind.FIELD,
     valueType: FieldValueType.STRING,
   },
   [SpanIndexedField.SPAN_DESCRIPTION]: {
-    desc: t('Parameterized and scrubbed description of the span'),
+    desc: t('Description of the span’s operation'),
+    kind: FieldKind.FIELD,
+    valueType: FieldValueType.STRING,
+  },
+  [SpanIndexedField.NORMALIZED_DESCRIPTION]: {
+    desc: t(
+      'Parameterized and normalized description of the span, commonly used for grouping within insights'
+    ),
     kind: FieldKind.FIELD,
     valueType: FieldValueType.STRING,
   },
@@ -1750,6 +1759,11 @@ const EVENT_FIELD_DEFINITIONS: Record<AllEventFieldKeys, FieldDefinition> = {
   },
   [FieldKey.TRANSACTION_STATUS]: {
     desc: t('Describes the status of the span/transaction'),
+    kind: FieldKind.FIELD,
+    valueType: FieldValueType.STRING,
+  },
+  [FieldKey.TYPE]: {
+    desc: t('Type of event (Errors, transactions, csp and default)'),
     kind: FieldKind.FIELD,
     valueType: FieldValueType.STRING,
   },

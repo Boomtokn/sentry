@@ -4,6 +4,7 @@ import type {Node} from '@react-types/shared';
 import isEqual from 'lodash/isEqual';
 
 import {addSuccessMessage} from 'sentry/actionCreators/indicator';
+import DisableInDemoMode from 'sentry/components/acl/demoModeDisabled';
 import {Button} from 'sentry/components/button';
 import ButtonBar from 'sentry/components/buttonBar';
 import {DraggableTabList} from 'sentry/components/draggableTabs/draggableTabList';
@@ -118,14 +119,16 @@ function IssueViewsIssueListHeader({
             </Button>
           )}
           {!newViewActive && (
-            <Button
-              size="sm"
-              data-test-id="real-time"
-              title={realtimeTitle}
-              aria-label={realtimeTitle}
-              icon={realtimeActive ? <IconPause /> : <IconPlay />}
-              onClick={() => onRealtimeChange(!realtimeActive)}
-            />
+            <DisableInDemoMode>
+              <Button
+                size="sm"
+                data-test-id="real-time"
+                title={realtimeTitle}
+                aria-label={realtimeTitle}
+                icon={realtimeActive ? <IconPause /> : <IconPlay />}
+                onClick={() => onRealtimeChange(!realtimeActive)}
+              />
+            </DisableInDemoMode>
           )}
         </ButtonBar>
       </Layout.HeaderActions>
@@ -217,41 +220,40 @@ function IssueViewsIssueListHeaderTabsContent({
         environments,
         timeFilters,
       } = views[0]!;
-      if (queryProjects || queryTimeFilters) {
-        navigate(
-          normalizeUrl({
-            ...location,
-            query: {
-              ...router.location.query,
-              viewId: id,
-              query: query ?? viewQuery,
-              sort: sort ?? querySort,
-              project: queryProjects ?? projects,
-              environment: queryEnvs ?? environments,
-              ...normalizeDateTimeParams(queryTimeFilters ?? timeFilters),
-            },
-          }),
-          {replace: true}
-        );
-        tabListState?.setSelectedKey(views[0]!.key);
-        return;
-      }
       if (!query && !sort) {
-        navigate(
-          normalizeUrl({
-            ...location,
-            query: {
-              ...router.location.query,
-              viewId: id,
-              query: viewQuery,
-              sort: querySort,
-              project: projects,
-              environment: environments,
-              ...normalizeDateTimeParams(timeFilters),
-            },
-          }),
-          {replace: true}
-        );
+        if (queryProjects || queryTimeFilters) {
+          navigate(
+            normalizeUrl({
+              ...location,
+              query: {
+                ...router.location.query,
+                viewId: id,
+                query: query ?? viewQuery,
+                sort: sort ?? querySort,
+                project: queryProjects ?? projects,
+                environment: queryEnvs ?? environments,
+                ...normalizeDateTimeParams(queryTimeFilters ?? timeFilters),
+              },
+            }),
+            {replace: true}
+          );
+        } else {
+          navigate(
+            normalizeUrl({
+              ...location,
+              query: {
+                ...router.location.query,
+                viewId: id,
+                query: viewQuery,
+                sort: querySort,
+                project: projects,
+                environment: environments,
+                ...normalizeDateTimeParams(timeFilters),
+              },
+            }),
+            {replace: true}
+          );
+        }
         tabListState?.setSelectedKey(views[0]!.key);
         return;
       }

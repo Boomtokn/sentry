@@ -774,7 +774,8 @@ CELERY_IMPORTS = (
     "sentry.replays.tasks",
     "sentry.monitors.tasks.clock_pulse",
     "sentry.monitors.tasks.detect_broken_monitor_envs",
-    "sentry.relocation.tasks",
+    "sentry.relocation.tasks.process",
+    "sentry.relocation.tasks.transfer",
     "sentry.tasks.assemble",
     "sentry.tasks.auth",
     "sentry.tasks.auto_remove_inbox",
@@ -837,6 +838,7 @@ CELERY_IMPORTS = (
     "sentry.integrations.vsts.tasks",
     "sentry.integrations.vsts.tasks.kickoff_subscription_check",
     "sentry.integrations.tasks",
+    "sentry.demo_mode.tasks",
 )
 
 # Enable split queue routing
@@ -893,6 +895,12 @@ CELERY_QUEUES_CONTROL = [
     Queue("options.control", routing_key="options.control", exchange=control_exchange),
     Queue("outbox.control", routing_key="outbox.control", exchange=control_exchange),
     Queue("webhook.control", routing_key="webhook.control", exchange=control_exchange),
+    Queue("relocation.control", routing_key="relocation.control", exchange=control_exchange),
+    Queue(
+        "release_registry.control",
+        routing_key="release_registry.control",
+        exchange=control_exchange,
+    ),
 ]
 
 CELERY_ISSUE_STATES_QUEUE = Queue(
@@ -995,6 +1003,8 @@ CELERY_QUEUES_REGION = [
     Queue("on_demand_metrics", routing_key="on_demand_metrics"),
     Queue("check_new_issue_threshold_met", routing_key="check_new_issue_threshold_met"),
     Queue("integrations_slack_activity_notify", routing_key="integrations_slack_activity_notify"),
+    Queue("demo_mode", routing_key="demo_mode"),
+    Queue("release_registry", routing_key="release_registry"),
 ]
 
 from celery.schedules import crontab
@@ -1049,6 +1059,12 @@ CELERYBEAT_SCHEDULE_CONTROL = {
         # Run every 10 seconds as integration webhooks are delivered by this task
         "schedule": timedelta(seconds=10),
         "options": {"expires": 60, "queue": "webhook.control"},
+    },
+    "fetch-release-registry-data-control": {
+        "task": "sentry.tasks.release_registry.fetch_release_registry_data_control",
+        # Run every 5 minutes
+        "schedule": crontab(minute="*/5"),
+        "options": {"expires": 3600, "queue": "release_registry.control"},
     },
 }
 
@@ -1177,7 +1193,7 @@ CELERYBEAT_SCHEDULE_REGION = {
         "task": "sentry.tasks.release_registry.fetch_release_registry_data",
         # Run every 5 minutes
         "schedule": crontab(minute="*/5"),
-        "options": {"expires": 3600},
+        "options": {"expires": 3600, "queue": "release_registry"},
     },
     "snuba-subscription-checker": {
         "task": "sentry.snuba.tasks.subscription_checker",
@@ -1276,6 +1292,11 @@ CELERYBEAT_SCHEDULE_REGION = {
         # Run every 1 minute
         "schedule": crontab(minute="*/1"),
     },
+    "demo_mode_sync_artifact_bundles": {
+        "task": "sentry.demo_mode.tasks.sync_artifact_bundles",
+        # Run every hour
+        "schedule": crontab(minute="0", hour="*/1"),
+    },
 }
 
 # Assign the configuration keys celery uses based on our silo mode.
@@ -1344,6 +1365,9 @@ BGTASKS = {
 }
 
 # Taskworker settings #
+# Shared secret used to sign RPC requests to taskbrokers
+TASKWORKER_SHARED_SECRET: str | None = None
+
 # The list of modules that workers will import after starting up
 # Like celery, taskworkers need to import task modules to make tasks
 # accessible to the worker.
@@ -1353,6 +1377,7 @@ TASKWORKER_IMPORTS: tuple[str, ...] = (
 )
 TASKWORKER_ROUTER: str = "sentry.taskworker.router.DefaultRouter"
 TASKWORKER_ROUTES: dict[str, str] = {}
+
 # Schedules for taskworker tasks to be spawned on.
 TASKWORKER_SCHEDULES: ScheduleConfigMap = {}
 
@@ -2735,7 +2760,11 @@ SENTRY_BUILTIN_SOURCES = {
         "id": "sentry:nuget",
         "name": "NuGet.org",
         "layout": {"type": "symstore"},
-        "filters": {"filetypes": ["portablepdb"]},
+        # We mark this source as "requires checksum" so that downloads of
+        # portable PDB fies that don't have a debug checksum won't even be
+        # attempted. Such downloads always fail with a 403 error. See
+        # https://github.com/getsentry/team-ingest/issues/643.
+        "filters": {"filetypes": ["portablepdb"], "requires_checksum": True},
         "url": "https://symbols.nuget.org/download/symbols/",
         "is_public": True,
     },
@@ -2944,6 +2973,7 @@ KAFKA_TOPIC_TO_CLUSTER: Mapping[str, str] = {
     "ingest-transactions": "default",
     "ingest-transactions-dlq": "default",
     "ingest-transactions-backlog": "default",
+    "ingest-spans": "default",
     "ingest-metrics": "default",
     "ingest-metrics-dlq": "default",
     "snuba-metrics": "default",
@@ -3121,7 +3151,7 @@ PG_VERSION: str = os.getenv("PG_VERSION") or "14"
 # https://github.com/tbicr/django-pg-zero-downtime-migrations#settings
 ZERO_DOWNTIME_MIGRATIONS_RAISE_FOR_UNSAFE = True
 ZERO_DOWNTIME_MIGRATIONS_LOCK_TIMEOUT = None
-ZERO_DOWNTIME_MIGRATIONS_STATEMENT_TIMEOUT = None
+ZERO_DOWNTIME_MIGRATIONS_STATEMENT_TIMEOUT: str | None = None
 ZERO_DOWNTIME_MIGRATIONS_LOCK_TIMEOUT_FORCE = False
 ZERO_DOWNTIME_MIGRATIONS_IDEMPOTENT_SQL = False
 

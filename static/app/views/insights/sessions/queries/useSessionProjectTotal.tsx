@@ -9,7 +9,11 @@ export default function useSessionProjectTotal() {
 
   const locationWithoutWidth = {
     ...location,
-    query: {...location.query, width: undefined},
+    query: {
+      ...location.query,
+      width: undefined,
+      cursor: undefined,
+    },
   };
 
   const {
