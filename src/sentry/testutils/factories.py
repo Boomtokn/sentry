@@ -2021,10 +2021,14 @@ class Factories:
 
     @staticmethod
     def create_uptime_subscription_region(
-        subscription: UptimeSubscription, region_slug: str
+        subscription: UptimeSubscription,
+        region_slug: str,
+        mode: UptimeSubscriptionRegion.RegionMode,
     ) -> UptimeSubscriptionRegion:
         return UptimeSubscriptionRegion.objects.create(
-            uptime_subscription=subscription, region_slug=region_slug
+            uptime_subscription=subscription,
+            region_slug=region_slug,
+            mode=mode,
         )
 
     @staticmethod
@@ -2187,8 +2191,10 @@ class Factories:
 
     @staticmethod
     @assume_test_silo_mode(SiloMode.REGION)
-    def create_action(**kwargs) -> Action:
-        return Action.objects.create(**kwargs)
+    def create_action(type: Action.Type | None = None, **kwargs) -> Action:
+        if type is None:
+            type = Action.Type.SLACK
+        return Action.objects.create(type=type, **kwargs)
 
     @staticmethod
     @assume_test_silo_mode(SiloMode.REGION)

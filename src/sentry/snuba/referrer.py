@@ -114,6 +114,7 @@ class Referrer(StrEnum):
     API_ISSUES_ISSUE_EVENTS = "api.issues.issue_events"
     API_ISSUES_RELATED_ISSUES = "api.issues.related_issues"
     API_METRICS_TOTALS = "api.metrics.totals"
+    API_ORGANIZATION_TRACE_ITEM_DETAILS = "api.organization-trace-item-details"
     API_ORGANIZATION_EVENT_STATS_FIND_TOPN = "api.organization-event-stats.find-topn"
     API_ORGANIZATION_EVENT_STATS_METRICS_ENHANCED = "api.organization-event-stats.metrics-enhanced"
     API_ORGANIZATION_EVENT_STATS = "api.organization-event-stats"
@@ -836,6 +837,7 @@ class Referrer(StrEnum):
     SEARCH_GROUP_INDEX_SAMPLE = "search.group_index_sample"
     SEARCH_SNUBA_GROUP_ATTRIBUTES_SEARCH_QUERY = "search.snuba.group_attributes_search.query"
     SEARCH_SNUBA_GROUP_ATTRIBUTES_SEARCH_HITS = "search.snuba.group_attributes_search.hits"
+    SEER_RPC = "seer.rpc"
     SERIALIZERS_GROUPSERIALIZERSNUBA__EXECUTE_ERROR_SEEN_STATS_QUERY = (
         "serializers.GroupSerializerSnuba._execute_error_seen_stats_query"
     )

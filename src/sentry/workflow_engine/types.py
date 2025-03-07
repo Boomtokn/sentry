@@ -9,7 +9,9 @@ if TYPE_CHECKING:
     from sentry.deletions.base import ModelRelation
     from sentry.eventstore.models import GroupEvent
     from sentry.eventstream.base import GroupState
+    from sentry.snuba.models import SnubaQueryEventType
     from sentry.workflow_engine.models import Action, Detector, Workflow
+    from sentry.workflow_engine.models.data_condition import Condition
 
 T = TypeVar("T")
 
@@ -44,6 +46,8 @@ class WorkflowJob(EventJob, total=False):
 
 
 class ActionHandler:
+    config_schema: ClassVar[dict[str, Any]]
+
     @staticmethod
     def execute(job: WorkflowJob, action: Action, detector: Detector) -> None:
         raise NotImplementedError
@@ -71,3 +75,23 @@ class DataConditionHandler(Generic[T]):
     @staticmethod
     def evaluate_value(value: T, comparison: Any) -> DataConditionResult:
         raise NotImplementedError
+
+
+class DataConditionType(TypedDict):
+    id: int | None
+    comparison: int
+    type: Condition
+    condition_result: DetectorPriorityLevel
+    condition_group_id: int
+
+
+# TODO - Move this to snuba module
+class SnubaQueryDataSourceType(TypedDict):
+    query_type: int
+    dataset: str
+    query: str
+    aggregate: str
+    time_window: float
+    resolution: float
+    environment: str
+    event_types: list[SnubaQueryEventType]

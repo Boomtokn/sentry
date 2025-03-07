@@ -19,16 +19,17 @@ from sentry.models.organization import Organization
 from sentry.models.project import Project
 from sentry.models.repository import Repository
 from sentry.shared_integrations.exceptions import ApiError
+from sentry.utils import metrics
 from sentry.utils.locking import UnableToAcquireLock
 
-from .constants import DRY_RUN_PLATFORMS
+from .constants import METRIC_PREFIX
 from .integration_utils import (
     InstallationCannotGetTreesError,
     InstallationNotFoundError,
     get_installation,
 )
 from .stacktraces import get_frames_to_process
-from .utils import supported_platform
+from .utils import is_dry_run_platform, supported_platform
 
 logger = logging.getLogger(__name__)
 
@@ -64,10 +65,12 @@ def process_event(project_id: int, group_id: int, event_id: str) -> list[CodeMap
         logger.error("Event not found.", extra=extra)
         return []
 
-    if not supported_platform(event.platform):
+    platform = event.platform
+    assert platform is not None
+    if not supported_platform(platform):
         return []
 
-    frames_to_process = get_frames_to_process(event.data, event.platform)
+    frames_to_process = get_frames_to_process(event.data, platform)
     if not frames_to_process:
         return []
 
@@ -76,9 +79,8 @@ def process_event(project_id: int, group_id: int, event_id: str) -> list[CodeMap
         installation = get_installation(org)
         trees = get_trees_for_org(installation, org, extra)
         trees_helper = CodeMappingTreesHelper(trees)
-        code_mappings = trees_helper.generate_code_mappings(frames_to_process)
-        if event.platform not in DRY_RUN_PLATFORMS:
-            set_project_codemappings(code_mappings, installation, project)
+        code_mappings = trees_helper.generate_code_mappings(frames_to_process, platform)
+        create_repos_and_code_mappings(code_mappings, installation, project, platform)
     except (InstallationNotFoundError, InstallationCannotGetTreesError):
         pass
 
@@ -155,15 +157,17 @@ def get_trees_for_org(
         return trees
 
 
-def set_project_codemappings(
+def create_repos_and_code_mappings(
     code_mappings: list[CodeMapping],
     installation: IntegrationInstallation,
     project: Project,
+    platform: str,
 ) -> None:
     """
     Given a list of code mappings, create a new repository project path
     config for each mapping.
     """
+    dry_run = is_dry_run_platform(platform)
     organization_integration = installation.org_integration
     if not organization_integration:
         raise InstallationNotFoundError
@@ -177,32 +181,50 @@ def set_project_codemappings(
         )
 
         if not repository:
-            repository = Repository.objects.create(
-                name=code_mapping.repo.name,
-                organization_id=organization_id,
-                integration_id=organization_integration.integration_id,
+            if not dry_run:
+                repository = Repository.objects.create(
+                    name=code_mapping.repo.name,
+                    organization_id=organization_id,
+                    integration_id=organization_integration.integration_id,
+                )
+            metrics.incr(
+                key=f"{METRIC_PREFIX}.repository.created",
+                tags={"platform": platform, "dry_run": dry_run},
+                sample_rate=1.0,
             )
 
-        cm, created = RepositoryProjectPathConfig.objects.get_or_create(
-            project=project,
-            stack_root=code_mapping.stacktrace_root,
-            defaults={
-                "repository": repository,
-                "organization_integration_id": organization_integration.id,
-                "integration_id": organization_integration.integration_id,
-                "organization_id": organization_integration.organization_id,
-                "source_root": code_mapping.source_path,
-                "default_branch": code_mapping.repo.branch,
-                "automatically_generated": True,
-            },
+        extra = {
+            "project_id": project.id,
+            "stack_root": code_mapping.stacktrace_root,
+            "repository_name": code_mapping.repo.name,
+        }
+        # The project and stack_root are unique together
+        existing_code_mappings = RepositoryProjectPathConfig.objects.filter(
+            project=project, stack_root=code_mapping.stacktrace_root
         )
-        if not created:
-            logger.info(
-                "Code mapping already exists",
-                extra={
-                    "project": project,
-                    "stacktrace_root": code_mapping.stacktrace_root,
-                    "new_code_mapping": code_mapping,
-                    "existing_code_mapping": cm,
-                },
+        if existing_code_mappings.exists():
+            logger.warning("Investigate.", extra=extra)
+            continue
+
+        if not dry_run:
+            if repository is None:  # This is mostly to appease the type checker
+                logger.warning("Investigate.", extra=extra)
+                continue
+
+            RepositoryProjectPathConfig.objects.create(
+                project=project,
+                stack_root=code_mapping.stacktrace_root,
+                repository=repository,
+                organization_integration_id=organization_integration.id,
+                integration_id=organization_integration.integration_id,
+                organization_id=organization_integration.organization_id,
+                source_root=code_mapping.source_path,
+                default_branch=code_mapping.repo.branch,
+                automatically_generated=True,
             )
+
+        metrics.incr(
+            key=f"{METRIC_PREFIX}.code_mapping.created",
+            tags={"platform": platform, "dry_run": dry_run},
+            sample_rate=1.0,
+        )

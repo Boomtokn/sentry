@@ -19,6 +19,7 @@ from sentry import features
 from sentry.api.invite_helper import ApiInviteHelper, remove_invite_details_from_session
 from sentry.auth.superuser import is_active_superuser
 from sentry.constants import WARN_SESSION_EXPIRED
+from sentry.demo_mode.utils import get_demo_user, is_demo_mode_enabled, is_demo_org
 from sentry.http import get_server_hostname
 from sentry.hybridcloud.rpc import coerce_id_from
 from sentry.models.authprovider import AuthProvider
@@ -540,6 +541,7 @@ class AuthLoginView(BaseView):
                 organization=organization, request=request
             ),  # NOTE: not utilized in basic login page (only org login)
             "show_login_banner": settings.SHOW_LOGIN_BANNER,
+            "show_partner_login_banner": request.GET.get("partner") is not None,
             "referrer": request.GET.get("referrer"),
         }
         default_context.update(additional_context.run_callbacks(request=request))
@@ -566,6 +568,12 @@ class AuthLoginView(BaseView):
         """
         op = request.POST.get("op")
         organization = kwargs.pop("organization", None)
+
+        if is_demo_mode_enabled() and is_demo_org(organization):
+            # Performs the auto login of a demo user to a demo org
+            user = get_demo_user()
+            self._handle_login(request, user, organization)
+            return self.redirect(get_login_redirect(request))
 
         if request.method == "GET" and request.subdomain and self.org_exists(request):
             urls = [
